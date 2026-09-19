@@ -1,0 +1,11 @@
+{
+  "name": "gsb-sw-debug-console",
+  "version": "1.0.0",
+  "description": "Service Worker 故障注入 / 请求录制 / 离线重放调试台",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check sw.js && node --check js/app.js && node --check js/db.js && node --check js/rules.js && node --check server.js"
+  }
+}

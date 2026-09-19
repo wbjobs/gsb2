@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gsb 调试台 · Service Worker 故障注入 / 录制重放</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>gsb 调试台</h1>
+    <div class="status-bar">
+      <span id="swStatus" class="badge badge-off">SW: 未连接</span>
+      <span id="swVersion" class="badge badge-muted">-</span>
+      <span id="recStatus" class="badge badge-muted">录制: 关</span>
+      <span id="replayStatus" class="badge badge-muted">重放: 关</span>
+      <span id="tabCount" class="badge badge-muted">受控标签页: 1</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- 规则 -->
+    <section class="card">
+      <h2>故障注入规则 <small>按顺序匹配，命中第一条生效</small></h2>
+      <div class="rule-form">
+        <label>匹配方式
+          <select id="fMatchType">
+            <option value="includes">包含</option>
+            <option value="prefix">前缀</option>
+            <option value="exact">精确</option>
+            <option value="regexp">正则</option>
+          </select>
+        </label>
+        <label class="grow">URL 匹配
+          <input id="fPattern" type="text" placeholder="/api/users" value="/api/echo">
+        </label>
+        <label>Method
+          <select id="fMethod">
+            <option>ANY</option><option>GET</option><option>POST</option>
+            <option>PUT</option><option>DELETE</option><option>PATCH</option>
+          </select>
+        </label>
+        <label>动作
+          <select id="fAction">
+            <option value="delay">延迟</option>
+            <option value="status">指定状态码</option>
+            <option value="mock">Mock JSON</option>
+            <option value="offline">直接断网</option>
+            <option value="drop">随机丢包</option>
+          </select>
+        </label>
+        <label>延迟(ms, 0-30000)
+          <input id="fDelay" type="number" min="0" max="30000" value="0">
+        </label>
+        <label>状态码
+          <input id="fStatus" type="number" min="100" max="599" value="500">
+        </label>
+        <label>丢包率(%)
+          <input id="fLoss" type="number" min="0" max="100" value="50">
+        </label>
+        <label class="grow">Mock JSON
+          <textarea id="fBody" rows="2" placeholder='{"code":0,"data":[]}'>{"mocked": true}</textarea>
+        </label>
+        <button id="btnAddRule" class="btn btn-primary">添加规则</button>
+      </div>
+      <table class="rule-table">
+        <thead>
+          <tr><th>#</th><th>启用</th><th>匹配</th><th>Method</th><th>动作</th><th>参数</th><th></th></tr>
+        </thead>
+        <tbody id="ruleRows"></tbody>
+      </table>
+      <div class="row-actions">
+        <button id="btnExport" class="btn">导出 JSON</button>
+        <button id="btnImport" class="btn">导入 JSON</button>
+        <input id="importFile" type="file" accept="application/json" hidden>
+      </div>
+    </section>
+
+    <!-- 测试流量 -->
+    <section class="card">
+      <h2>测试流量 <small>页面所有 fetch 都经过 SW（本面板接口同源）</small></h2>
+      <div class="row-actions wrap">
+        <button data-method="GET" data-url="/api/echo?q=hello" class="btn traffic">GET echo</button>
+        <button data-method="GET" data-url="/api/echo?q=fail" class="btn traffic">GET echo?q=fail</button>
+        <button data-method="POST" data-url="/api/echo" data-body="{<button data-fetch="POST /api/echo {&quot;n&quot;:1}" class="btn">POST echo (body)</button>quot;n<button data-fetch="POST /api/echo {&quot;n&quot;:1}" class="btn">POST echo (body)</button>quot;:1}" class="btn traffic">POST echo (body)</button>
+        <button data-method="GET" data-url="/api/users" class="btn traffic">GET users</button>
+        <button data-method="GET" data-url="/api/items" class="btn traffic">GET items</button>
+        <button data-method="GET" data-url="/api/status/404" class="btn traffic">status/404</button>
+        <button data-method="GET" data-url="/api/slow" class="btn traffic">slow (真实 3s)</button>
+        <button id="btnBatch" class="btn btn-primary">批量 20 个请求</button>
+      </div>
+      <h3 class="sub">结果</h3>
+      <div id="requestResults" class="result-list"></div>
+    </section>
+
+    <!-- 录制 / 重放 -->
+    <section class="card">
+      <h2>录制 &amp; 离线重放</h2>
+      <div class="row-actions">
+        <button id="btnRecord" class="btn">● 开始录制</button>
+        <button id="btnReplay" class="btn" disabled>离线重放全部</button>
+        <button id="btnClearRec" class="btn">清空录制</button>
+        <span class="hint">重放请先在 DevTools Network 切 Offline（SW 直接读本地，不触网）</span>
+      </div>
+      <table class="rule-table">
+        <thead>
+          <tr><th>#</th><th>method</th><th>url</th><th>状态</th><th>重放校验</th></tr>
+        </thead>
+        <tbody id="recRows"></tbody>
+      </table>
+      <div id="replaySummary" class="summary"></div>
+    </section>
+
+    <!-- 缓存 / 生命周期 -->
+    <section class="card">
+      <h2>缓存与 SW 生命周期</h2>
+      <div class="row-actions wrap">
+        <button id="btnListCaches" class="btn">检查 CacheStorage</button>
+        <button id="btnUpdateSW" class="btn">触发 SW 更新检查</button>
+        <button id="btnUnregister" class="btn btn-danger">注销 SW 并重置</button>
+      </div>
+      <div id="swLog" class="result-list"></div>
+    </section>
+
+    <!-- 事件日志 -->
+    <section class="card span-2">
+      <h2>事件日志 <button id="btnClearLog" class="btn btn-small">清空</button></h2>
+      <div id="eventLog" class="event-log"></div>
+    </section>
+  </main>
+
+  <script src="js/db.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
