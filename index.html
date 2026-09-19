@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网络调试台 · Service Worker</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>网络调试台</h1>
+    <div class="sw-info">
+      <span>Service Worker：</span>
+      <strong id="sw-status">未注册</strong>
+      <span class="muted">版本 <span id="sw-version">?</span></span>
+      <button class="btn small" id="sw-update">检查更新</button>
+      <button class="btn small danger" id="sw-unregister">注销 SW</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 左列：开关 + 规则 -->
+    <section class="panel panel-left">
+      <h2>全局开关</h2>
+      <div class="switches">
+        <label class="switch">
+          <input type="checkbox" id="toggle-enabled">
+          <span>故障注入总开关</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="toggle-offline">
+          <span>离线模拟（断网）</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="toggle-recording">
+          <span>录制真实请求</span>
+        </label>
+      </div>
+      <div id="status-bar" class="status-bar idle">全部关闭（请求正常透传）</div>
+
+      <div class="panel-title-row">
+        <h2>注入规则</h2>
+        <div>
+          <button class="btn small" id="add-rule">新增规则</button>
+          <button class="btn small danger" id="clear-rules">清空规则</button>
+        </div>
+      </div>
+      <p class="hint">规则按顺序匹配，首条命中生效。匹配范围为页面发出的 fetch/XHR（不含导航与静态资源）。</p>
+      <ul id="rules-list" class="rules-list"></ul>
+    </section>
+
+    <!-- 右列：录制 / 重放 / 标签页 / 日志 -->
+    <section class="panel panel-right">
+      <div class="panel-title-row">
+        <h2>录制记录 <span class="badge" id="record-count">0</span></h2>
+        <div>
+          <button class="btn small" id="gen-one">发 1 个演示请求</button>
+          <button class="btn" id="gen-traffic">发 20 个演示请求</button>
+          <button class="btn primary" id="replay-all">断网重放全部</button>
+          <button class="btn small danger" id="clear-records">清空录制</button>
+        </div>
+      </div>
+
+      <div class="table-wrap tall">
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th><th>URL</th><th>状态</th><th>请求体</th><th>响应体</th><th>预览</th>
+            </tr>
+          </thead>
+          <tbody id="records-body"></tbody>
+        </table>
+      </div>
+
+      <h2>重放结果比对</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th><th>URL</th><th>录制时</th><th>重放时</th><th>耗时</th><th>结论</th>
+            </tr>
+          </thead>
+          <tbody id="replay-body"></tbody>
+        </table>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <h2>受控标签页 <span class="badge" id="tab-count">0</span></h2>
+          <div class="table-wrap small">
+            <table>
+              <thead><tr><th>标签页 ID</th><th>最后心跳</th><th>状态</th></tr></thead>
+              <tbody id="tabs-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h2>运行日志</h2>
+          <div id="log-body" class="log-body"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./js/db.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
